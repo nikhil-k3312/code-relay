@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Code Relay — Participant</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #08090d; --surface: #0e1016; --surface2: #13161e; --border: #1c2030;
+    --accent: #7c6aff; --green: #00ff88; --red: #ff4444; --yellow: #ffd60a;
+    --blue: #00bfff; --text: #dde1ec; --muted: #5a6380;
+    --mono: 'IBM Plex Mono', monospace; --sans: 'IBM Plex Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; overflow-x: hidden; }
+  #login-screen { display:flex; align-items:center; justify-content:center; min-height:100vh; background:radial-gradient(ellipse at 60% 40%, #120d2e 0%, var(--bg) 65%); }
+  .login-box { border:1px solid var(--accent); padding:48px 40px; width:420px; background:var(--surface); box-shadow:0 0 80px rgba(124,106,255,0.1); }
+  .login-tag { font-family:var(--mono); font-size:11px; color:var(--accent); letter-spacing:3px; text-transform:uppercase; margin-bottom:8px; }
+  .login-box h1 { font-size:28px; font-weight:600; margin-bottom:4px; }
+  .login-box p { color:var(--muted); font-size:13px; margin-bottom:32px; line-height:1.6; }
+  .field { margin-bottom:20px; }
+  .field label { display:block; font-family:var(--mono); font-size:10px; color:var(--accent); letter-spacing:2px; text-transform:uppercase; margin-bottom:8px; }
+  .field input, .field select { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:12px 14px; font-family:var(--mono); font-size:14px; outline:none; transition:border-color 0.2s; }
+  .field input:focus, .field select:focus { border-color:var(--accent); }
+  .login-btn { width:100%; padding:14px; background:var(--accent); color:#fff; font-family:var(--mono); font-size:13px; font-weight:700; letter-spacing:2px; border:none; cursor:pointer; transition:all 0.2s; text-transform:uppercase; }
+  .login-btn:hover { opacity:0.85; } .login-btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .error-msg { color:var(--red); font-family:var(--mono); font-size:12px; margin-top:12px; text-align:center; min-height:16px; }
+  .info-box { background:rgba(124,106,255,0.08); border:1px solid rgba(124,106,255,0.2); padding:14px; margin-bottom:24px; }
+  .info-box p { font-family:var(--mono); font-size:11px; color:var(--muted); line-height:1.9; margin:0; }
+  .topbar { background:var(--surface); border-bottom:1px solid var(--border); padding:0 24px; height:58px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
+  .topbar-left { display:flex; align-items:center; gap:16px; }
+  .event-badge { font-family:var(--mono); font-size:12px; font-weight:700; color:var(--accent); }
+  .team-chip { background:rgba(124,106,255,0.12); border:1px solid rgba(124,106,255,0.3); padding:6px 14px; font-family:var(--mono); font-size:12px; color:var(--accent); }
+  .timer-block { display:flex; align-items:center; gap:10px; }
+  .timer-label { font-family:var(--mono); font-size:10px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; }
+  .timer-display { font-family:var(--mono); font-size:22px; font-weight:700; color:var(--green); background:var(--bg); border:1px solid var(--border); padding:6px 16px; min-width:90px; text-align:center; transition:color 0.3s,border-color 0.3s; }
+  .timer-display.warn { color:var(--yellow); border-color:var(--yellow); }
+  .timer-display.danger { color:var(--red); border-color:var(--red); animation:timerFlash 1s infinite; }
+  @keyframes timerFlash { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .logout-btn { background:none; border:1px solid var(--border); color:var(--muted); padding:7px 16px; font-family:var(--mono); font-size:11px; cursor:pointer; transition:all 0.2s; }
+  .logout-btn:hover { border-color:var(--red); color:var(--red); }
+  #done-screen { display:none; align-items:center; justify-content:center; height:calc(100vh - 58px); flex-direction:column; gap:20px; background:radial-gradient(ellipse at center, #001a0d 0%, var(--bg) 70%); }
+  .done-title { font-family:var(--mono); font-size:22px; color:var(--green); }
+  .done-sub { font-family:var(--mono); font-size:12px; color:var(--muted); text-align:center; line-height:2.2; max-width:540px; white-space:pre-wrap; }
+  .score-chip { font-family:var(--mono); font-size:52px; font-weight:700; color:var(--green); }
+  .score-label { font-family:var(--mono); font-size:11px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; }
+  #editor-layout { display:none; height:calc(100vh - 61px); flex-direction:row; }
+  .problem-pane { width:40%; min-width:300px; max-width:460px; border-right:1px solid var(--border); background:var(--surface); overflow-y:auto; display:flex; flex-direction:column; height:100%; }
+  .code-pane { flex:1; display:flex; flex-direction:column; min-width:0; height:100%; overflow:hidden; }
+  .pane-header { padding:16px 20px 14px; border-bottom:1px solid var(--border); background:var(--surface2); flex-shrink:0; }
+  .pane-header .q-tag { font-family:var(--mono); font-size:10px; color:var(--accent); letter-spacing:3px; text-transform:uppercase; margin-bottom:6px; }
+  .pane-header h2 { font-size:16px; font-weight:600; margin-bottom:4px; line-height:1.3; }
+  .pane-header .pts { font-family:var(--mono); font-size:11px; color:var(--green); }
+  .diff-badge { display:inline-block; font-family:var(--mono); font-size:9px; padding:2px 7px; text-transform:uppercase; letter-spacing:1px; margin-left:8px; vertical-align:middle; }
+  .diff-easy { background:rgba(0,255,136,0.1); color:var(--green); border:1px solid rgba(0,255,136,0.3); }
+  .diff-medium { background:rgba(255,214,10,0.1); color:var(--yellow); border:1px solid rgba(255,214,10,0.3); }
+  .diff-hard { background:rgba(255,68,68,0.1); color:var(--red); border:1px solid rgba(255,68,68,0.3); }
+  .problem-body { padding:18px 20px; flex:1; }
+  .problem-body h4 { font-family:var(--mono); font-size:10px; color:var(--accent); letter-spacing:2px; text-transform:uppercase; margin:0 0 8px; }
+  .problem-body p { font-size:13px; line-height:1.8; color:var(--text); margin-bottom:16px; white-space:pre-wrap; }
+  .sample-block { background:var(--bg); border:1px solid var(--border); padding:10px 13px; margin-bottom:8px; }
+  .sample-block pre { font-family:var(--mono); font-size:12px; color:var(--blue); line-height:1.7; white-space:pre-wrap; }
+  .sample-pair { margin-bottom:16px; }
+  .sample-pair-label { font-family:var(--mono); font-size:9px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:4px; }
+  .relay-info { background:rgba(124,106,255,0.06); border:1px solid rgba(124,106,255,0.2); padding:10px 13px; margin-bottom:16px; font-family:var(--mono); font-size:11px; color:var(--muted); line-height:1.9; }
+  .constraints-box { background:rgba(0,191,255,0.04); border:1px solid rgba(0,191,255,0.15); padding:9px 13px; margin-bottom:16px; font-family:var(--mono); font-size:11px; color:var(--muted); line-height:1.9; }
+  .q-progress-bar-outer { background:var(--surface2); border-bottom:1px solid var(--border); padding:8px 16px; display:flex; align-items:center; gap:8px; flex-shrink:0; }
+  .q-dot { width:28px; height:28px; border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:10px; font-weight:700; transition:all 0.3s; flex-shrink:0; }
+  .q-dot.current { border-color:var(--accent); color:var(--accent); box-shadow:0 0 8px rgba(124,106,255,0.3); }
+  .q-dot.done-pass { border-color:var(--green); color:var(--green); background:rgba(0,255,136,0.08); }
+  .q-dot.done-partial { border-color:var(--yellow); color:var(--yellow); background:rgba(255,214,10,0.08); }
+  .q-dot.done-fail { border-color:var(--red); color:var(--red); background:rgba(255,68,68,0.08); }
+  .q-dot.done-timeout { border-color:var(--muted); color:var(--muted); }
+  .q-dot.locked { color:var(--muted); opacity:0.4; }
+  .q-progress-label { font-family:var(--mono); font-size:10px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; white-space:nowrap; }
+  .code-toolbar { background:var(--surface2); border-bottom:1px solid var(--border); padding:8px 14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; flex-shrink:0; }
+  .lang-select { background:var(--bg); border:1px solid var(--border); color:var(--text); padding:6px 10px; font-family:var(--mono); font-size:12px; outline:none; cursor:pointer; transition:border-color 0.2s; }
+  .lang-select:focus { border-color:var(--accent); }
+  .toolbar-sep { width:1px; height:22px; background:var(--border); }
+  .member-input { background:var(--bg); border:1px solid var(--border); color:var(--text); padding:6px 10px; font-family:var(--mono); font-size:12px; outline:none; width:155px; transition:border-color 0.2s; }
+  .member-input:focus { border-color:var(--accent); } .member-input::placeholder { color:var(--muted); }
+  .flex-spacer { flex:1; }
+  .action-btn { padding:7px 16px; font-family:var(--mono); font-size:11px; font-weight:700; letter-spacing:1px; border:none; cursor:pointer; transition:all 0.2s; text-transform:uppercase; }
+  .btn-run { background:var(--surface); border:1px solid var(--border); color:var(--text); }
+  .btn-run:hover { border-color:var(--accent); color:var(--accent); } .btn-run:disabled { opacity:0.4; cursor:not-allowed; }
+  .btn-submit { background:var(--green); color:#000; } .btn-submit:hover { opacity:0.85; } .btn-submit:disabled { opacity:0.4; cursor:not-allowed; }
+  .code-area-wrap { flex:1; position:relative; overflow:hidden; min-height:0; }
+  #code-editor { width:100%; height:100%; background:var(--bg); color:var(--text); border:none; padding:18px 20px; font-family:var(--mono); font-size:13px; line-height:1.7; resize:none; outline:none; tab-size:2; caret-color:var(--accent); }
+  #code-editor:disabled { opacity:0.5; cursor:not-allowed; }
+  .output-bar { background:var(--surface2); border-top:1px solid var(--border); height:200px; display:flex; flex-direction:column; flex-shrink:0; }
+  .output-header { padding:8px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  .output-label { font-family:var(--mono); font-size:10px; color:var(--accent); letter-spacing:2px; text-transform:uppercase; flex:1; }
+  .output-tabs { display:flex; gap:3px; }
+  .out-tab { padding:3px 10px; font-family:var(--mono); font-size:10px; cursor:pointer; border:1px solid var(--border); background:transparent; color:var(--muted); transition:all 0.15s; letter-spacing:1px; }
+  .out-tab.active { background:var(--accent); color:#000; border-color:var(--accent); font-weight:700; }
+  .output-body { padding:12px 14px; font-family:var(--mono); font-size:12px; line-height:1.7; overflow-y:auto; flex:1; color:var(--muted); white-space:pre-wrap; }
+  .output-body.error { color:var(--red); } .output-body.success { color:var(--green); }
+  #tc-results-panel { display:none; overflow-y:auto; flex:1; flex-direction:column; }
+  .tc-row { display:flex; align-items:center; gap:10px; padding:7px 12px; border-bottom:1px solid var(--border); }
+  .tc-row.tc-pass { border-left:3px solid var(--green); }
+  .tc-row.tc-fail { border-left:3px solid var(--red); }
+  .tc-row.tc-running { border-left:3px solid var(--yellow); animation:tcPulse 1s infinite; }
+  @keyframes tcPulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+  .tc-icon { font-family:var(--mono); font-size:13px; font-weight:700; width:20px; flex-shrink:0; }
+  .tc-label { font-family:var(--mono); font-size:11px; color:var(--muted); flex:1; }
+  .tc-status-text { font-family:var(--mono); font-size:10px; letter-spacing:1px; font-weight:700; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .tc-progress-row { display:flex; align-items:center; gap:10px; padding:7px 14px; background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0; }
+  .tc-progress-bar-wrap { flex:1; height:3px; background:var(--border); }
+  .tc-progress-bar { height:100%; background:var(--accent); transition:width 0.3s; }
+  .timer-bar-wrap { height:3px; background:var(--border); }
+  .timer-bar { height:100%; background:var(--green); transition:width 1s linear,background 0.3s; }
+  .banner { display:none; position:fixed; top:61px; left:0; right:0; z-index:300; padding:12px 24px; font-family:var(--mono); font-size:12px; text-align:center; animation:slideDown 0.3s ease; }
+  @keyframes slideDown { from{transform:translateY(-100%)} to{transform:translateY(0)} }
+  .banner.warn { background:rgba(255,214,10,0.15); border-bottom:1px solid var(--yellow); color:var(--yellow); }
+  .banner.success { background:rgba(0,255,136,0.1); border-bottom:1px solid var(--green); color:var(--green); }
+  .banner.error { background:rgba(255,68,68,0.1); border-bottom:1px solid var(--red); color:var(--red); }
+  .banner.info { background:rgba(124,106,255,0.1); border-bottom:1px solid var(--accent); color:var(--accent); }
+  ::-webkit-scrollbar { width:5px; height:5px; } ::-webkit-scrollbar-track { background:var(--bg); } ::-webkit-scrollbar-thumb { background:var(--border); }
+  .toast { position:fixed; bottom:24px; right:24px; background:var(--accent); color:#fff; padding:10px 20px; font-family:var(--mono); font-size:12px; font-weight:700; z-index:999; opacity:0; transform:translateY(10px); transition:all 0.3s; pointer-events:none; }
+  .toast.show { opacity:1; transform:translateY(0); }
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:500; align-items:center; justify-content:center; }
+  .modal-overlay.open { display:flex; }
+  .modal { background:var(--surface); border:1px solid var(--accent); padding:32px; width:460px; max-width:95vw; text-align:center; }
+  .modal h3 { font-family:var(--mono); font-size:15px; color:var(--accent); letter-spacing:2px; margin-bottom:14px; text-transform:uppercase; }
+  .modal p { font-size:13px; color:var(--muted); line-height:1.7; margin-bottom:22px; }
+  .modal-actions { display:flex; gap:12px; justify-content:center; }
+  .m-btn { padding:10px 26px; font-family:var(--mono); font-size:12px; font-weight:700; border:1px solid; cursor:pointer; letter-spacing:1px; text-transform:uppercase; transition:all 0.2s; background:transparent; }
+  .m-btn-yes { border-color:var(--green); color:var(--green); } .m-btn-yes:hover { background:var(--green); color:#000; }
+  .m-btn-no { border-color:var(--border); color:var(--muted); } .m-btn-no:hover { border-color:var(--text); color:var(--text); }
+  #loading-screen { display:flex; align-items:center; justify-content:center; min-height:100vh; flex-direction:column; gap:16px; }
+  .loading-text { font-family:var(--mono); font-size:14px; color:var(--accent); letter-spacing:2px; }
+  .loading-sub { font-family:var(--mono); font-size:11px; color:var(--muted); }
+  @media(max-width:768px){ #editor-layout{flex-direction:column;height:auto;min-height:calc(100vh - 61px)} .problem-pane{width:100%;max-width:100%;height:50vh;border-right:none;border-bottom:1px solid var(--border)} .code-pane{height:50vh} }
+</style>
+</head>
+<body>
+
+<!-- LOADING SCREEN (while fetching questions from Firebase) -->
+<div id="loading-screen" style="display:none">
+  <div style="font-family:var(--mono);font-size:28px;color:var(--accent)">⟳</div>
+  <div class="loading-text">LOADING QUESTIONS...</div>
+  <div class="loading-sub">Fetching from Firebase</div>
+</div>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-tag">// MITE · CS Department</div>
+    <h1>Code Relay</h1>
+    <p>Round 1 — Participant Portal<br/>Enter your team details to begin.</p>
+    <div class="info-box"><p>→ Up to 4 questions · 15 min each<br/>→ Relay format: one member per question<br/>→ Supported: Python · C · Java<br/>→ Proportional scoring: (tests passed / total) × 25 pts<br/>→ Just fill in the function body — no stdin/stdout needed</p></div>
+    <div class="field"><label>Team Name</label><input type="text" id="team-name-input" placeholder="e.g. Team Phoenix" autocomplete="off"/></div>
+    <div class="field"><label>Team Size</label><select id="team-size-input"><option value="2">2 Members</option><option value="3">3 Members</option><option value="4" selected>4 Members</option></select></div>
+    <button class="login-btn" id="login-btn" onclick="doLogin()">JOIN EVENT →</button>
+    <div class="error-msg" id="login-error"></div>
+  </div>
+</div>
+
+<!-- TOPBAR -->
+<div class="topbar" id="topbar" style="display:none">
+  <div class="topbar-left"><div class="event-badge">CODE RELAY · R1</div><div class="team-chip" id="team-chip">TEAM</div></div>
+  <div class="timer-block"><div class="timer-label">Time Left</div><div class="timer-display" id="timer-display">15:00</div></div>
+  <button class="logout-btn" onclick="confirmLogout()">✕ Exit</button>
+</div>
+<div class="timer-bar-wrap" id="timer-bar-wrap" style="display:none"><div class="timer-bar" id="timer-bar" style="width:100%"></div></div>
+<div class="banner" id="banner"></div>
+
+<!-- EDITOR LAYOUT -->
+<div id="editor-layout">
+  <div class="problem-pane">
+    <div class="pane-header">
+      <div class="q-tag" id="q-tag">Question 1</div>
+      <h2 id="q-title">Loading...</h2>
+      <div class="pts" id="q-pts">25 pts · proportional scoring</div>
+    </div>
+    <div class="problem-body">
+      <div class="relay-info" id="relay-info"></div>
+      <h4>Problem Statement</h4>
+      <p id="q-desc">Loading...</p>
+      <h4>Constraints</h4>
+      <div class="constraints-box" id="q-constraints">—</div>
+      <h4>Examples</h4>
+      <div id="samples-container"></div>
+      <h4>Notes</h4>
+      <p style="font-family:var(--mono);font-size:11px;color:var(--muted)">· Fill in the function body — just return the answer<br/>· Do NOT add print/scanf/cin inside your function<br/>· Score = (tests passed / total tests) × 25 pts<br/>· Timer auto-submits when it hits zero</p>
+    </div>
+  </div>
+  <div class="code-pane">
+    <div class="q-progress-bar-outer" id="q-progress"><span class="q-progress-label">Progress:</span></div>
+    <div class="code-toolbar">
+      <span style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase">Lang:</span>
+      <select class="lang-select" id="lang-select" onchange="onLangChange()">
+        <option value="python" selected>Python</option><option value="c">C</option><option value="java">Java</option>
+      </select>
+      <div class="toolbar-sep"></div>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase">Member:</span>
+      <input class="member-input" id="member-name" placeholder="Your name" autocomplete="off"/>
+      <div class="flex-spacer"></div>
+      <button class="action-btn btn-run" id="run-btn" onclick="runSample()">▷ Run Sample</button>
+      <button class="action-btn btn-submit" id="submit-btn" onclick="confirmSubmit()">✓ Submit</button>
+    </div>
+    <div class="code-area-wrap"><textarea id="code-editor" spellcheck="false"></textarea></div>
+    <div class="output-bar">
+      <div class="output-header">
+        <div class="output-label">Output</div>
+        <div class="output-tabs">
+          <button class="out-tab active" id="tab-console" onclick="switchOutputTab('console')">Console</button>
+          <button class="out-tab" id="tab-tests" onclick="switchOutputTab('tests')">Tests <span id="tc-badge" style="display:none;font-size:9px;padding:1px 5px;border-radius:2px;margin-left:3px;font-weight:700"></span></button>
+        </div>
+        <span id="run-status" style="font-family:var(--mono);font-size:10px;color:var(--muted)"></span>
+      </div>
+      <div class="output-body" id="output-body">// Run Sample to test Example 1, or Submit to grade all hidden test cases.</div>
+      <div id="tc-results-panel">
+        <div class="tc-progress-row" id="tc-progress-row" style="display:none">
+          <span id="tc-progress-label" style="font-family:var(--mono);font-size:10px;color:var(--muted);white-space:nowrap">Running...</span>
+          <div class="tc-progress-bar-wrap"><div class="tc-progress-bar" id="tc-progress-bar" style="width:0%"></div></div>
+          <span id="tc-progress-count" style="font-family:var(--mono);font-size:10px;color:var(--muted);white-space:nowrap">0/0</span>
+        </div>
+        <div id="tc-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- HANDOFF SCREEN (shown between questions) -->
+<div id="handoff-screen" style="display:none;position:fixed;inset:0;z-index:400;background:radial-gradient(ellipse at center,#0d0820 0%,var(--bg) 70%);align-items:center;justify-content:center;flex-direction:column;gap:24px;">
+  <div style="font-size:48px">🔁</div>
+  <div style="font-family:var(--mono);font-size:20px;color:var(--accent);letter-spacing:2px;text-transform:uppercase">Next Participant</div>
+  <div style="font-family:var(--mono);font-size:13px;color:var(--muted);text-align:center;line-height:2;" id="handoff-msg">Please call the next team member to the keyboard.</div>
+  <div style="font-family:var(--mono);font-size:60px;font-weight:700;color:var(--yellow);min-width:100px;text-align:center;" id="handoff-countdown">60</div>
+  <div style="font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:2px;">SECONDS UNTIL NEXT QUESTION STARTS</div>
+  <button onclick="skipHandoff()" style="margin-top:8px;background:none;border:1px solid rgba(124,106,255,0.4);color:var(--accent);padding:10px 28px;font-family:var(--mono);font-size:12px;cursor:pointer;letter-spacing:1px;transition:all 0.2s;" onmouseover="this.style.background='rgba(124,106,255,0.12)'" onmouseout="this.style.background='none'">▶ START NOW</button>
+</div>
+
+<!-- DONE SCREEN -->
+<div id="done-screen">
+  <div style="font-size:52px">&#127937;</div>
+  <div class="done-title">Round 1 Complete!</div>
+  <div class="score-chip" id="final-score">0</div>
+  <div class="score-label">/ 100 Points Earned</div>
+  <div class="done-sub" id="done-detail"></div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal">
+    <h3 id="modal-title">Confirm Submission</h3>
+    <p id="modal-msg">Submit your solution?</p>
+    <div class="modal-actions">
+      <button class="m-btn m-btn-yes" id="modal-yes-btn">Yes, Submit</button>
+      <button class="m-btn m-btn-no" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── FIREBASE ──────────────────────────────────────────────────────────────────
+const FIREBASE_URL = 'https://codecrest-1d533-default-rtdb.asia-southeast1.firebasedatabase.app/';
+async function fbPush(path, data) {
+  try {
+    const res = await fetch(`${FIREBASE_URL}/${path}.json`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    return json && json.name ? json.name : null; // Firebase returns { name: "<pushKey>" }
+  } catch(e) { console.error('fbPush error:', e); return null; }
+}
+async function fbSet(path, data) {
+  try { await fetch(`${FIREBASE_URL}/${path}.json`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) }); }
+  catch(e) { console.error('fbSet error:', e); }
+}
+async function fbGet(path) {
+  try {
+    const res = await fetch(`${FIREBASE_URL}/${path}.json`);
+    return await res.json();
+  } catch(e) { return null; }
+}
+
+// ── QUESTIONS (loaded from Firebase) ─────────────────────────────────────────
+let QUESTIONS = [];
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let teamName = '', teamSize = 4, currentQ = 0;
+let timerInterval = null, timeLeft = 900, questionStart = null;
+let questionResults = [], submitted = false, modalCallback = null;
+let _lastLang = 'python';
+let _handoffInterval = null;
+const RELAY_TIME = 15 * 60;
+const HANDOFF_TIME = 60; // 1 minute between questions
+
+// ── CODE RUNNER ───────────────────────────────────────────────────────────────
+// Uses Judge0 CE (free, no API key needed, CORS-enabled for browser requests).
+// Falls back to Piston via a public CORS proxy if Judge0 is unavailable.
+//
+// WHY NOT PISTON DIRECTLY?
+// Piston (emkc.org and mirrors) blocks direct browser requests with CORS headers.
+// Calling it from a local HTML file always results in "Failed to fetch".
+// Judge0 CE explicitly allows browser-side requests.
+
+// ── Judge0 language IDs ───────────────────────────────────────────────────────
+const JUDGE0_LANG_ID = {
+  python: 71,   // Python 3.8.1
+  c:      50,   // C (GCC 9.2.0)
+  java:   62,   // Java (OpenJDK 13.0.1)
+};
+
+// Public Judge0 CE instances (tried in order)
+const JUDGE0_HOSTS = [
+  'https://judge0-ce.p.rapidapi.com',          // RapidAPI — free tier, no key needed for basic use
+  'https://ce.judge0.com',                      // official public instance
+];
+
+function fetchWithTimeout(url, options = {}, ms = 20000) {
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(id));
+}
+
+// Submit code to Judge0 and poll until result is ready
+async function runOnJudge0(host, langId, code, stdin) {
+  // Step 1: submit
+  const submitRes = await fetchWithTimeout(`${host}/submissions?base64_encoded=false&wait=false`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ language_id: langId, source_code: code, stdin: stdin || '' })
+  }, 15000);
+  if (!submitRes.ok) throw new Error(`Submit failed: HTTP ${submitRes.status}`);
+  const { token } = await submitRes.json();
+  if (!token) throw new Error('No token returned from Judge0');
+
+  // Step 2: poll for result (up to 15 seconds)
+  for (let i = 0; i < 20; i++) {
+    await new Promise(r => setTimeout(r, 800));
+    const pollRes = await fetchWithTimeout(
+      `${host}/submissions/${token}?base64_encoded=false&fields=status,stdout,stderr,compile_output,message`, {
+        headers: { 'Accept': 'application/json' }
+      }, 10000);
+    if (!pollRes.ok) continue;
+    const data = await pollRes.json();
+    const statusId = data.status?.id;
+    // Status IDs: 1=In Queue, 2=Processing, 3=Accepted, 4=WrongAnswer, 5+=Error
+    if (statusId === 1 || statusId === 2) continue; // still running
+    const stdout = (data.stdout || '').trim();
+    const stderr = (data.stderr || data.compile_output || data.message || '').trim();
+    return { stdout, stderr, ok: true };
+  }
+  throw new Error('Timed out waiting for Judge0 result');
+}
+
+// Master executor — tries Judge0 hosts, then falls back to Piston via CORS proxy
+async function executePiston(language, code, stdin) {
+  const langId = JUDGE0_LANG_ID[language];
+  let lastError = '';
+
+  // Try each Judge0 host
+  for (const host of JUDGE0_HOSTS) {
+    try {
+      const result = await runOnJudge0(host, langId, code, stdin);
+      return result;
+    } catch (e) {
+      lastError = `Judge0 (${host}): ${e.message}`;
+    }
+  }
+
+  // Final fallback: Piston via allorigins CORS proxy
+  try {
+    const PISTON = 'https://emkc.org/api/v2/piston/execute';
+    const VERSIONS = { python: '3.10.0', c: '10.2.0', java: '15.0.2' };
+    const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(PISTON);
+    const res = await fetchWithTimeout(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ language, version: VERSIONS[language], files: [{ content: code }], stdin: stdin || '' })
+    }, 20000);
+    if (!res.ok) throw new Error('Proxy HTTP ' + res.status);
+    const data = await res.json();
+    return {
+      stdout: (data.run?.stdout || '').trim(),
+      stderr: (data.run?.stderr || data.compile?.stderr || '').trim(),
+      ok: true
+    };
+  } catch (e) {
+    lastError += ` | Piston proxy: ${e.message}`;
+  }
+
+  return { stdout: '', stderr: '', ok: false, error: lastError };
+}
+
+// ── LOGIN ─────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const name = document.getElementById('team-name-input').value.trim();
+  if (name.length < 2) { document.getElementById('login-error').textContent = '// Team name must be at least 2 characters'; return; }
+  teamName = name;
+  teamSize = parseInt(document.getElementById('team-size-input').value);
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true; btn.textContent = 'LOADING QUESTIONS...';
+
+  // Load questions from Firebase
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('loading-screen').style.display = 'flex';
+
+  let loaded = await fbGet('cr_questions');
+  if (loaded && Array.isArray(loaded)) {
+    QUESTIONS = loaded.filter(q => q && q.title).slice(0, teamSize);
+  }
+
+  if (QUESTIONS.length === 0) {
+    // Fallback: show error
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('login-error').textContent = '// No questions found. Ask the admin to publish questions first.';
+    btn.disabled = false; btn.textContent = 'JOIN EVENT →';
+    return;
+  }
+
+  // Clamp teamSize to number of available questions
+  teamSize = Math.min(teamSize, QUESTIONS.length);
+
+  await fbSet('cr_teams/' + teamName.replace(/[^a-zA-Z0-9]/g, '_'), { name: teamName, size: teamSize, joinedAt: new Date().toISOString() });
+
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('topbar').style.display = 'flex';
+  document.getElementById('timer-bar-wrap').style.display = 'block';
+  document.getElementById('team-chip').textContent = teamName.toUpperCase();
+  document.getElementById('editor-layout').style.display = 'flex';
+  btn.textContent = 'JOIN EVENT →'; btn.disabled = false;
+  startQuestion(0);
+}
+
+// ── QUESTION FLOW ─────────────────────────────────────────────────────────────
+function startQuestion(idx) {
+  if (idx >= teamSize || idx >= QUESTIONS.length) { showDoneScreen(); return; }
+  currentQ = idx; submitted = false; timeLeft = RELAY_TIME; questionStart = Date.now();
+  document.getElementById('done-screen').style.display = 'none';
+  document.getElementById('editor-layout').style.display = 'flex';
+  const q = QUESTIONS[idx];
+  document.getElementById('q-tag').textContent = `Question ${idx + 1} of ${teamSize}`;
+
+  const diffClass = q.difficulty === 'easy' ? 'diff-easy' : q.difficulty === 'hard' ? 'diff-hard' : 'diff-medium';
+  document.getElementById('q-title').innerHTML = escHtml(q.title) + `<span class="diff-badge ${diffClass}">${q.difficulty || 'medium'}</span>`;
+  document.getElementById('q-desc').textContent = q.description || '';
+  document.getElementById('q-constraints').textContent = q.constraints || '—';
+
+  const sc = document.getElementById('samples-container');
+  const samples = q.samples || [];
+  sc.innerHTML = samples.map((s, i) => `
+    <div class="sample-pair">
+      <div class="sample-pair-label">Example ${i + 1} — Input</div>
+      <div class="sample-block"><pre>${escHtml(s.input)}</pre></div>
+      <div class="sample-pair-label">Example ${i + 1} — Output</div>
+      <div class="sample-block"><pre>${escHtml(s.output)}</pre></div>
+    </div>
+  `).join('');
+
+  const tcCount = (q.testCases || []).length;
+  document.getElementById('relay-info').innerHTML = `→ Relay Slot ${idx+1} of ${teamSize} &nbsp;·&nbsp; Enter your name in toolbar<br/>→ Timer: <strong style="color:var(--yellow)">15 minutes</strong> &nbsp;·&nbsp; Score = (passed / ${tcCount}) × 25 pts`;
+
+  // Enable editor
+  document.getElementById('code-editor').disabled = false;
+  document.getElementById('submit-btn').disabled = false;
+  document.getElementById('run-btn').disabled = false;
+  document.getElementById('member-name').value = '';
+  document.getElementById('output-body').textContent = '// Run Sample to test Example 1, or Submit to grade all hidden test cases.';
+  document.getElementById('output-body').className = 'output-body';
+  document.getElementById('tc-list').innerHTML = '';
+  document.getElementById('tc-badge').style.display = 'none';
+  document.getElementById('tc-progress-row').style.display = 'none';
+  switchOutputTab('console');
+
+  // Reset language selector to python on every new question
+  document.getElementById('lang-select').value = 'python';
+  _lastLang = 'python';
+
+  // FIX #2: Always reset the boilerplate unconditionally on new question
+  setBoilerplateFresh();
+  renderProgress();
+  clearInterval(timerInterval); updateTimerDisplay();
+  timerInterval = setInterval(tick, 1000);
+  showBanner('warn', `⏱ Q${idx + 1} started — ${q.title} — 15 minutes`);
+}
+
+// Always set boilerplate fresh (no check — called only on new question start)
+function setBoilerplateFresh() {
+  const lang = document.getElementById('lang-select').value;
+  const q = QUESTIONS[currentQ];
+  const bp = (q.boilerplates && q.boilerplates[lang]) ? q.boilerplates[lang] : getDefaultBoilerplate(lang, q.title);
+  document.getElementById('code-editor').value = bp;
+}
+
+// Called on lang change — always load new boilerplate, confirm if user has written custom code
+function onLangChange() {
+  const lang = document.getElementById('lang-select').value;
+  const q = QUESTIONS[currentQ];
+  const curVal = document.getElementById('code-editor').value;
+  const newBp = (q.boilerplates && q.boilerplates[lang]) ? q.boilerplates[lang] : getDefaultBoilerplate(lang, q.title);
+
+  // Check if current content is ANY of the known boilerplates (unmodified)
+  const bps = ['python','c','java'].map(l => (q.boilerplates && q.boilerplates[l]) || getDefaultBoilerplate(l, q.title));
+  const isUnmodified = !curVal.trim() || bps.some(b => b.trim() === curVal.trim());
+
+  if (isUnmodified) {
+    // Safe to swap directly — nothing custom written yet
+    document.getElementById('code-editor').value = newBp;
+  } else {
+    // User has written code — ask before discarding
+    if (confirm('Switching language will replace your current code with the ' + lang.toUpperCase() + ' boilerplate.\n\nAre you sure? Your current code will be lost.')) {
+      document.getElementById('code-editor').value = newBp;
+    } else {
+      // Revert the select back to the previous language
+      const prev = ['python','c','java'].find(l => {
+        const b = (q.boilerplates && q.boilerplates[l]) || getDefaultBoilerplate(l, q.title);
+        return b.trim() !== curVal.trim();
+      });
+      // Simply revert by finding which lang matches current code, else just load new bp anyway
+      // Best approach: store last lang and revert
+      document.getElementById('lang-select').value = _lastLang || 'python';
+    }
+  }
+  _lastLang = document.getElementById('lang-select').value;
+}
+
+function getDefaultBoilerplate(lang, title) {
+  const fn = (title || 'solution').replace(/\s+/g, '_').toLowerCase();
+  if (lang === 'python') return `def ${fn}():\n    # Write your solution here\n    pass\n`;
+  if (lang === 'c') return `// Write your solution here\nint ${fn}() {\n    return 0;\n}\n`;
+  if (lang === 'java') return `class Solution {\n    public int ${fn}() {\n        // Write your solution here\n        return 0;\n    }\n}\n`;
+  return '';
+}
+
+// ── CODE EXECUTION (LeetCode-style via Piston) ────────────────────────────────
+//
+// HOW IT WORKS:
+// The admin defines a "makeCode runner" string per language for each question.
+// These are template strings stored as makeCodStr.python / .c / .java
+// At runtime we do a simple text substitution:
+//   - We prepend the participant's function code
+//   - We append the runner line(s) that call the function and print output
+//
+// The runner string uses {{INPUT}} as a placeholder for the raw test case input.
+// The full program is sent to the Piston code execution API which runs it in a sandbox.
+// Piston runs the code, captures stdout, and we compare to the expected output (exact match).
+//
+// Example for Python:
+//   boilerplate:  "def sock_merchant(n, ar):\n    pass\n"
+//   makeCodStr:   "print(sock_merchant(int(input()), list(map(int,input().split()))))"
+//   testCase.inputStr: "9\n10 20 20 10 10 30 50 10 20"
+//   Full code sent to Piston:
+//     def sock_merchant(n, ar):
+//         pass                   <- participant writes this part
+//     print(sock_merchant(int(input()), list(map(int,input().split()))))
+//   stdin: "9\n10 20 20 10 10 30 50 10 20"
+//
+// The participant writes ONLY the function body. The runner handles I/O.
+
+function buildFullCode(participantCode, lang, runnerStr) {
+  const code = participantCode || '';
+  if (!runnerStr || !runnerStr.trim()) {
+    // No runner configured — run participant code as a complete program.
+    return code;
+  }
+  // Separate participant code from runner with a blank line.
+  return code.trimEnd() + '\n\n' + runnerStr.trim() + '\n';
+}
+
+// ── RUN SAMPLE ────────────────────────────────────────────────────────────────
+async function runSample() {
+  const code = document.getElementById('code-editor').value;
+  const lang = document.getElementById('lang-select').value;
+  const out = document.getElementById('output-body');
+  const status = document.getElementById('run-status');
+  const runBtn = document.getElementById('run-btn');
+  switchOutputTab('console');
+  out.className = 'output-body'; out.textContent = '// Running...'; status.textContent = '⟳'; runBtn.disabled = true;
+
+  const q = QUESTIONS[currentQ];
+  const samples = q.samples || [];
+  const tc0 = (q.testCases && q.testCases[0]) || null;
+  const runnerStr = q.makeCodStr ? (q.makeCodStr[lang] || '') : '';
+
+  // Warn if no runner is configured — output will be empty without it
+  if (!runnerStr.trim()) {
+    out.className = 'output-body error';
+    out.textContent = '// ⚠ No runner (makeCode) is configured for ' + lang + ' on this question.\n// Ask your admin to set the makeCode runner so your function can be called.\n// Without it, your function definition alone produces no output.';
+    status.textContent = '⚠ No runner'; status.style.color = 'var(--yellow)';
+    runBtn.disabled = false; return;
+  }
+
+  const fullCode = buildFullCode(code, lang, runnerStr);
+  // Use first test-case input as stdin for Run Sample; fall back to first sample's input
+  const stdinInput = tc0?.inputStr || (samples[0] ? samples[0].input : '');
+
+  try {
+    const result = await executePiston(lang, fullCode, stdinInput);
+    if (!result.ok) {
+      out.className = 'output-body error';
+      out.textContent = `// ✗ Could not reach any code execution server.\n// ${result.error}\n// Check your internet connection and try again.`;
+      status.textContent = '✗ Offline'; status.style.color = 'var(--red)';
+    } else if (result.stderr && !result.stdout) {
+      // Determine error type for better messaging
+      const errText = result.stderr;
+      const isCompile = /error:|SyntaxError|undefined reference|cannot find symbol|expected|undeclared/i.test(errText);
+      out.className = 'output-body error';
+      out.textContent = (isCompile ? '// ✗ Compile / Syntax Error:\n\n' : '// ✗ Runtime Error:\n\n') + errText;
+      status.textContent = isCompile ? '✗ Syntax Error' : '✗ Runtime Error';
+      status.style.color = 'var(--red)';
+    } else if (result.stderr && result.stdout) {
+      // Ran but also produced stderr (e.g. warnings or partial runtime error)
+      out.className = 'output-body';
+      out.textContent = '// Output:\n' + result.stdout + '\n\n// Stderr / Warnings:\n' + result.stderr;
+      const expected = tc0 ? String(tc0.expected).trim() : (samples[0] ? samples[0].output.trim() : '');
+      if (expected && result.stdout.trim() === expected) { status.textContent = '✓ Correct (with warnings)'; status.style.color = 'var(--yellow)'; }
+      else { status.textContent = '⚠ Check stderr'; status.style.color = 'var(--yellow)'; }
+    } else {
+      out.className = 'output-body success'; out.textContent = result.stdout || '// (no output)';
+      const expected = tc0 ? String(tc0.expected).trim() : (samples[0] ? samples[0].output.trim() : '');
+      if (expected && result.stdout === expected) { status.textContent = '✓ Correct'; status.style.color = 'var(--green)'; }
+      else if (expected) { status.textContent = `≠ Expected: ${expected}`; status.style.color = 'var(--yellow)'; }
+      else { status.textContent = '✓ Ran'; status.style.color = 'var(--green)'; }
+    }
+  } catch(e) {
+    out.className = 'output-body error';
+    out.textContent = '// Unexpected error: ' + e.message;
+    status.textContent = '✗ Error'; status.style.color = 'var(--red)';
+  }
+  runBtn.disabled = false;
+}
+
+// ── TEST CASE RUNNER ──────────────────────────────────────────────────────────
+async function runAllTestCases(code, lang, q) {
+  const tcList = document.getElementById('tc-list');
+  const progressRow = document.getElementById('tc-progress-row');
+  const progressBar = document.getElementById('tc-progress-bar');
+  const progressLabel = document.getElementById('tc-progress-label');
+  const progressCount = document.getElementById('tc-progress-count');
+  const badge = document.getElementById('tc-badge');
+  progressRow.style.display = 'flex'; tcList.innerHTML = '';
+  const tcs = q.testCases || [];
+  tcs.forEach((_, i) => {
+    tcList.innerHTML += `<div class="tc-row tc-running" id="tcrow-${i}">
+      <div class="tc-icon" id="tcicon-${i}" style="color:var(--yellow)">⟳</div>
+      <div class="tc-label">Test Case ${i + 1}</div>
+      <div class="tc-status-text" id="tctext-${i}" style="color:var(--yellow)">RUNNING</div>
+    </div>`;
+  });
+  const results = [];
+  const runnerStr = q.makeCodStr ? (q.makeCodStr[lang] || '') : '';
+  let apiDown = false; // track if ALL calls failed (network outage)
+
+  for (let i = 0; i < tcs.length; i++) {
+    progressLabel.textContent = `Running TC ${i+1}/${tcs.length}...`;
+    progressBar.style.width = ((i / tcs.length) * 100) + '%';
+    progressCount.textContent = `${i}/${tcs.length}`;
+    const tc = tcs[i];
+    const fullCode = buildFullCode(code, lang, runnerStr);
+    const stdinInput = tc.inputStr || '';
+    let passed = false, output = '', runnerError = false;
+
+    const result = await executePiston(lang, fullCode, stdinInput);
+    if (!result.ok) {
+      output = '[API error: ' + result.error + ']';
+      runnerError = true;
+      apiDown = true;
+    } else if (result.stderr && !result.stdout) {
+      // Compile/syntax/runtime error — not a passing result
+      const isCompile = /error:|SyntaxError|undefined reference|cannot find symbol|expected|undeclared/i.test(result.stderr);
+      output = (isCompile ? '[Compile Error] ' : '[Runtime Error] ') + result.stderr.substring(0, 120);
+      passed = false;
+    } else {
+      output = result.stdout || result.stderr || '[no output]';
+      passed = result.stdout === String(tc.expected).trim();
+    }
+
+    results.push({ passed, output, expected: String(tc.expected || ''), runnerError });
+    const row = document.getElementById(`tcrow-${i}`);
+    const icon = document.getElementById(`tcicon-${i}`);
+    const text = document.getElementById(`tctext-${i}`);
+    if (runnerError) {
+      row.className = 'tc-row'; row.style.borderLeft = '3px solid var(--yellow)';
+      icon.textContent = '?'; icon.style.color = 'var(--yellow)';
+      text.textContent = 'API ERROR'; text.style.color = 'var(--yellow)';
+    } else {
+      row.className = 'tc-row ' + (passed ? 'tc-pass' : 'tc-fail');
+      icon.textContent = passed ? '✓' : '✗'; icon.style.color = passed ? 'var(--green)' : 'var(--red)';
+      text.textContent = passed ? 'PASS' : `FAIL (got: ${output.substring(0, 25)})`;
+      text.style.color = passed ? 'var(--green)' : 'var(--red)';
+    }
+  }
+
+  const passCount = results.filter(r => r.passed).length;
+  const errorCount = results.filter(r => r.runnerError).length;
+  progressBar.style.width = '100%';
+  progressBar.style.background = apiDown ? 'var(--yellow)' : passCount === tcs.length ? 'var(--green)' : passCount > 0 ? 'var(--yellow)' : 'var(--red)';
+  progressCount.textContent = apiDown ? `⚠ ${errorCount} errors` : `${passCount}/${tcs.length}`;
+  progressLabel.textContent = apiDown
+    ? '⚠ API unreachable — submission not scored'
+    : passCount === tcs.length ? '✓ All passed!' : `${passCount}/${tcs.length} passed`;
+  progressLabel.style.color = apiDown ? 'var(--yellow)' : passCount === tcs.length ? 'var(--green)' : 'var(--yellow)';
+  badge.style.display = 'inline';
+  badge.textContent = apiDown ? '⚠' : `${passCount}/${tcs.length}`;
+  badge.style.background = apiDown ? 'var(--yellow)' : passCount === tcs.length ? 'var(--green)' : passCount > 0 ? 'var(--yellow)' : 'var(--red)';
+  badge.style.color = '#000';
+  return { results, apiDown };
+}
+
+// ── SUBMIT ────────────────────────────────────────────────────────────────────
+function confirmSubmit() {
+  const code = document.getElementById('code-editor').value.trim();
+  const q = QUESTIONS[currentQ];
+  const lang = document.getElementById('lang-select').value;
+  const bp = (q.boilerplates && q.boilerplates[lang]) ? q.boilerplates[lang].trim() : '';
+  if (!code || (bp && code === bp)) { showBanner('warn', '// Write your solution before submitting!'); return; }
+  const tcCount = (q.testCases || []).length;
+  openModal(`Submit Q${currentQ + 1}?`, `Will run ${tcCount} hidden test case${tcCount !== 1 ? 's' : ''}. Score = (passed / ${tcCount}) × 25 pts.`, doSubmit);
+}
+
+async function doSubmit() {
+  if (submitted) return; submitted = true;
+  clearInterval(timerInterval);
+  const timeUsed = Math.round((Date.now() - questionStart) / 1000);
+  lockEditor();
+  const q = QUESTIONS[currentQ];
+  const tcCount = (q.testCases || []).length;
+  showBanner('info', `⟳ Running ${tcCount} test cases for Q${currentQ + 1}...`);
+  switchOutputTab('tests');
+  const code = document.getElementById('code-editor').value;
+  const lang = document.getElementById('lang-select').value;
+  const { results: tcResults, apiDown } = await runAllTestCases(code, lang, q);
+
+  // If the API was completely unreachable, do NOT record a 0-score submission.
+  // Unlock the editor and let the participant retry once connectivity is restored.
+  if (apiDown) {
+    submitted = false;
+    document.getElementById('code-editor').disabled = false;
+    document.getElementById('submit-btn').disabled = false;
+    document.getElementById('run-btn').disabled = false;
+    clearInterval(timerInterval);
+    timerInterval = setInterval(tick, 1000); // resume timer
+    showBanner('error', '⚠ Could not reach the code runner — submission NOT recorded. Check your internet and try again.');
+    return;
+  }
+
+  const passed = tcResults.filter(r => r.passed).length;
+  const total = tcResults.length;
+  const points = total > 0 ? Math.round((passed / total) * 25) : 0;
+  const status = passed === total ? 'passed' : passed > 0 ? 'partial' : 'failed';
+  await recordSubmission(status, points, timeUsed, tcResults);
+  questionResults.push({ q: currentQ + 1, status, points, timeUsed, tcResults });
+  renderProgress();
+  if (passed === total) showBanner('success', `✓ Q${currentQ + 1}: All ${total} tests passed! +25 pts`);
+  else if (passed > 0) showBanner('warn', `◑ Q${currentQ + 1}: ${passed}/${total} passed · +${points} pts`);
+  else showBanner('error', `✗ Q${currentQ + 1}: 0/${total} passed · 0 pts`);
+  setTimeout(() => nextQuestion(), 4500);
+}
+
+// ── RECORD SUBMISSION ─────────────────────────────────────────────────────────
+async function recordSubmission(status, points, timeUsed, tcResults) {
+  const member = document.getElementById('member-name').value.trim() || `Member ${currentQ + 1}`;
+  const lang = document.getElementById('lang-select').value;
+  const code = document.getElementById('code-editor').value;
+  const q = QUESTIONS[currentQ];
+  const questionNum = currentQ + 1; // 1-based: 1,2,3,4
+  const payload = {
+    team: teamName,
+    member,
+    questionNum,
+    questionTitle: q.title,
+    language: lang,
+    status,
+    points,
+    tcPassed: tcResults.filter(r => r.passed).length,
+    tcTotal: tcResults.length,
+    timeUsedSeconds: timeUsed,
+    code,
+    testCaseResults: tcResults.map(r => ({ passed: r.passed, output: (r.output || '').substring(0, 100), expected: (r.expected || '').substring(0, 100) })),
+    submittedAt: new Date().toISOString()
+  };
+  // GUARANTEED FIX: fully await the push and write the key back into the record.
+  // This ensures Firebase has committed the record BEFORE doSubmit continues,
+  // so the admin poll will always find it on the very next 2s tick.
+  const pushKey = await fbPush('cr_submissions', payload);
+  if (pushKey) {
+    await fbSet(`cr_submissions/${pushKey}/pushKey`, pushKey);
+  }
+}
+
+// ── TIMER ─────────────────────────────────────────────────────────────────────
+function tick() { timeLeft--; updateTimerDisplay(); if (timeLeft <= 0) { clearInterval(timerInterval); autoTimeout(); } }
+function updateTimerDisplay() {
+  const el = document.getElementById('timer-display');
+  const bar = document.getElementById('timer-bar');
+  el.textContent = formatTime(timeLeft);
+  bar.style.width = ((timeLeft / RELAY_TIME) * 100) + '%';
+  if (timeLeft <= 60) { el.className = 'timer-display danger'; bar.style.background = 'var(--red)'; }
+  else if (timeLeft <= 180) { el.className = 'timer-display warn'; bar.style.background = 'var(--yellow)'; }
+  else { el.className = 'timer-display'; bar.style.background = 'var(--green)'; }
+}
+async function autoTimeout() {
+  if (submitted) return; submitted = true; lockEditor();
+  const timeUsed = Math.round((Date.now() - questionStart) / 1000);
+  showBanner('error', `⏰ Time expired for Q${currentQ + 1} — auto-submitted`);
+  await recordSubmission('timeout', 0, timeUsed, []);
+  questionResults.push({ q: currentQ + 1, status: 'timeout', points: 0, timeUsed, tcResults: [] });
+  renderProgress(); setTimeout(() => nextQuestion(), 3000);
+}
+
+// ── PROGRESS DOTS ─────────────────────────────────────────────────────────────
+function renderProgress() {
+  const c = document.getElementById('q-progress');
+  c.innerHTML = '<span class="q-progress-label">Progress:</span>';
+  for (let i = 0; i < teamSize; i++) {
+    const res = questionResults.find(r => r.q === i + 1);
+    let cls = 'q-dot';
+    if (res) { cls += res.status === 'passed' ? ' done-pass' : res.status === 'partial' ? ' done-partial' : res.status === 'timeout' ? ' done-timeout' : ' done-fail'; }
+    else if (i === currentQ) cls += ' current';
+    else cls += ' locked';
+    const lbl = res ? (res.status === 'passed' ? '✓' : res.status === 'partial' ? `${res.points}` : res.status === 'timeout' ? '⏰' : '✗') : `Q${i + 1}`;
+    c.innerHTML += `<div class="${cls}" title="Q${i+1}${res ? ' : ' + res.points + ' pts' : ''}">${lbl}</div>`;
+  }
+}
+
+// ── DONE ──────────────────────────────────────────────────────────────────────
+function showDoneScreen() {
+  clearInterval(timerInterval);
+  document.getElementById('editor-layout').style.display = 'none';
+  document.getElementById('done-screen').style.display = 'flex';
+  document.getElementById('timer-display').textContent = '00:00';
+  document.getElementById('timer-bar').style.width = '0%';
+  hideBanner();
+  const total = questionResults.reduce((s, r) => s + r.points, 0);
+  document.getElementById('final-score').textContent = total;
+  const detail = questionResults.map(r => {
+    const icon = r.status === 'passed' ? '✓' : r.status === 'timeout' ? '⏰' : r.status === 'partial' ? '◑' : '✗';
+    const tc = r.tcResults && r.tcResults.length > 0 ? ` [${r.tcResults.filter(t => t.passed).length}/${r.tcResults.length} tests]` : '';
+    return `${icon}  Q${r.q}: ${QUESTIONS[r.q-1]?.title || '?'}${tc}  →  ${r.points} pts  (${formatTime(r.timeUsed)})`;
+  }).join('\n');
+  document.getElementById('done-detail').textContent = detail + '\n\nResults saved to Firebase.';
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function switchOutputTab(name) {
+  const ob = document.getElementById('output-body');
+  const tp = document.getElementById('tc-results-panel');
+  document.querySelectorAll('.out-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + (name === 'console' ? 'console' : 'tests')).classList.add('active');
+  if (name === 'console') { ob.style.display = 'block'; tp.style.display = 'none'; }
+  else { ob.style.display = 'none'; tp.style.display = 'flex'; tp.style.flexDirection = 'column'; }
+}
+
+// ── MISC ──────────────────────────────────────────────────────────────────────
+function openModal(title, msg, cb) { modalCallback = cb; document.getElementById('modal-title').textContent = title; document.getElementById('modal-msg').textContent = msg; document.getElementById('modal-yes-btn').onclick = () => { closeModal(); cb(); }; document.getElementById('confirm-modal').classList.add('open'); }
+function closeModal() { document.getElementById('confirm-modal').classList.remove('open'); }
+function nextQuestion() {
+  hideBanner();
+  if (currentQ + 1 >= teamSize) {
+    showDoneScreen();
+  } else {
+    showHandoff(currentQ + 1);
+  }
+}
+
+function showHandoff(nextIdx) {
+  clearInterval(_handoffInterval);
+  // Hide editor, show handoff overlay
+  document.getElementById('handoff-screen').style.display = 'flex';
+  const nextQ = QUESTIONS[nextIdx];
+  document.getElementById('handoff-msg').innerHTML =
+    `✅ Q${nextIdx} submitted! Please call <strong style="color:var(--accent)">Member ${nextIdx + 1}</strong> to the keyboard.<br/>` +
+    `Next question: <strong style="color:var(--yellow)">${nextQ ? nextQ.title : 'Q' + (nextIdx + 1)}</strong>`;
+  let countdown = HANDOFF_TIME;
+  document.getElementById('handoff-countdown').textContent = countdown;
+
+  _handoffInterval = setInterval(() => {
+    countdown--;
+    document.getElementById('handoff-countdown').textContent = countdown;
+    if (countdown <= 10) {
+      document.getElementById('handoff-countdown').style.color = 'var(--red)';
+    }
+    if (countdown <= 0) {
+      clearInterval(_handoffInterval);
+      endHandoff(nextIdx);
+    }
+  }, 1000);
+}
+
+function skipHandoff() {
+  clearInterval(_handoffInterval);
+  const nextIdx = currentQ + 1;
+  endHandoff(nextIdx);
+}
+
+function endHandoff(nextIdx) {
+  document.getElementById('handoff-screen').style.display = 'none';
+  document.getElementById('handoff-countdown').style.color = 'var(--yellow)';
+  startQuestion(nextIdx);
+}
+function lockEditor() { document.getElementById('code-editor').disabled = true; document.getElementById('submit-btn').disabled = true; document.getElementById('run-btn').disabled = true; }
+function confirmLogout() { openModal('Exit Session?', 'Exiting will lose all progress. This cannot be undone.', () => { clearInterval(timerInterval); location.reload(); }); }
+function showBanner(type, msg) { const b = document.getElementById('banner'); b.textContent = msg; b.className = 'banner ' + type; b.style.display = 'block'; if (type !== 'error' && type !== 'info') setTimeout(hideBanner, 5000); }
+function hideBanner() { document.getElementById('banner').style.display = 'none'; }
+function formatTime(s) { return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
+function escHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('code-editor').addEventListener('keydown', e => {
+    if (e.key === 'Tab') { e.preventDefault(); const s = e.target.selectionStart, end = e.target.selectionEnd; e.target.value = e.target.value.substring(0, s) + '  ' + e.target.value.substring(end); e.target.selectionStart = e.target.selectionEnd = s + 2; }
+  });
+  document.getElementById('team-name-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+});
+</script>
+</body>
+</html>
